@@ -1,8 +1,7 @@
 /*
- * Diff Match and Patch
- *
- * Copyright 2010 geheimwerk.de.
- * http://code.google.com/p/google-diff-match-patch/
+ * Diff Match and Patch -- Test harness
+ * Copyright 2018 The diff-match-patch Authors.
+ * https://github.com/google/diff-match-patch
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,57 +22,38 @@
 #import <Foundation/Foundation.h>
 
 #import <DiffMatchPatch/DiffMatchPatch.h>
-#import "TestUtilities.h"
-#import "JXArcCompatibilityMacros.h"
-
-void diff_measureTimeForDiff(DiffMatchPatch *dmp, NSString *text1, NSString *text2, NSString *aDescription);
-
-void diff_measureTimeForDiff(DiffMatchPatch *dmp, NSString *text1, NSString *text2, NSString *aDescription) {
-  NSTimeInterval start = [NSDate timeIntervalSinceReferenceDate];
-  [dmp diff_mainOfOldString:text1 andNewString:text2];
-  NSTimeInterval duration = [NSDate timeIntervalSinceReferenceDate] - start;
-  
-  NSLog(@"%@Elapsed time: %.4lf", aDescription, (double)duration);
-}  
 
 int main (int argc, const char * argv[]) {
-  JX_NEW_AUTORELEASE_POOL_WITH_NAME(pool)
+  NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
 
-  NSString *text1FilePath = @"Speedtest1.txt";
-  NSString *text2FilePath = @"Speedtest2.txt";
-
-  NSArray *cliArguments = [[NSProcessInfo processInfo] arguments];
-  
-  if ([cliArguments count] == 3) {
-    text1FilePath = [cliArguments objectAtIndex:1];
-    text2FilePath = [cliArguments objectAtIndex:2];
+  NSString *directory = @"";
+  if (argc >= 1) {
+     directory = [NSString stringWithCString:argv[1] encoding:NSUTF8StringEncoding];
   }
 
-  NSString *text1 = diff_stringForFilePath(text1FilePath);
-  NSString *text2 = diff_stringForFilePath(text2FilePath);
+  NSString *filePath1 =
+      [directory stringByAppendingPathComponent:@"Tests/Speedtest1.txt"];
+  NSString *text1 = [NSString stringWithContentsOfFile:filePath1
+                        encoding:NSUTF8StringEncoding
+                           error:NULL];
+
+  NSString *filePath2 =
+      [directory stringByAppendingPathComponent:@"Tests/Speedtest2.txt"];
+  NSString *text2 = [NSString stringWithContentsOfFile:filePath2
+                        encoding:NSUTF8StringEncoding
+                           error:NULL];
 
   DiffMatchPatch *dmp = [DiffMatchPatch new];
   dmp.Diff_Timeout = 0;
 
-  NSString *aDescription;
+  NSTimeInterval start = [NSDate timeIntervalSinceReferenceDate];
+  [dmp diff_mainOfOldString:text1 andNewString:text2];
+  NSTimeInterval duration = [NSDate timeIntervalSinceReferenceDate] - start;
 
-#ifdef ENABLE_PERFORMANCE_TABLE_OUTPUT
-  NSUInteger limit;
-  for (int i = 8; i <= 24; i++) {
-    limit = pow(2.0, i);
-    if (limit > text1.length || limit > text2.length) break;
-    
-    aDescription = [NSString stringWithFormat:@"%8lu unichars, ", (unsigned long)limit];
-    diff_measureTimeForDiff(dmp, [text1 substringToIndex:limit], [text2 substringToIndex:limit], aDescription);
-  }
-#endif
+  [dmp release];
 
-  aDescription = [NSString stringWithFormat:@"%8lu unichars, ", (unsigned long)MAX(text1.length, text2.length)];
-  diff_measureTimeForDiff(dmp, text1, text2, aDescription);
+  NSLog(@"Elapsed time: %.4lf", (double)duration);
 
-  JX_RELEASE(dmp);
-
-  JX_END_AUTORELEASE_POOL_WITH_NAME(pool)
-
+  [pool drain];
   return 0;
 }

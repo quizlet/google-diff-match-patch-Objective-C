@@ -1,8 +1,7 @@
 /*
- * Diff Match and Patch
- *
- * Copyright 2010 geheimwerk.de.
- * http://code.google.com/p/google-diff-match-patch/
+ * Diff Match and Patch -- Test harness
+ * Copyright 2018 The diff-match-patch Authors.
+ * https://github.com/google/diff-match-patch
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +23,6 @@
 
 #import "DiffMatchPatch.h"
 #import "NSMutableDictionary+DMPExtensions.h"
-#import "JXArcCompatibilityMacros.h"
 
 #define stringForBOOL(A)  ([((NSNumber *)A) boolValue] ? @"true" : @"false")
 
@@ -47,7 +45,7 @@
   // Whole case.
   XCTAssertEqual((NSUInteger)4, [dmp diff_commonPrefixOfFirstString:@"1234" andSecondString:@"1234xyz"], @"Common suffix whole case failed.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_commonSuffixTest {
@@ -63,7 +61,7 @@
   // Whole case.
   XCTAssertEqual((NSUInteger)4, [dmp diff_commonSuffixOfFirstString:@"1234" andSecondString:@"xyz1234"], @"Detect any common suffix. Whole case.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_commonOverlapTest {
@@ -83,11 +81,11 @@
   XCTAssertEqual((NSUInteger)3, [dmp diff_commonOverlapOfFirstString:@"123456xxx" andSecondString:@"xxxabcd"], @"Detect any suffix/prefix overlap. Overlap.");
 
   // Unicode.
-  // Some overly clever languages (C#) may treat ligatures as equal to their 
+  // Some overly clever languages (C#) may treat ligatures as equal to their
   // component letters.  E.g. U+FB01 == 'fi'
   XCTAssertEqual((NSUInteger)0, [dmp diff_commonOverlapOfFirstString:@"fi" andSecondString:@"\U0000fb01i"], @"Detect any suffix/prefix overlap. Unicode.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_halfmatchTest {
@@ -132,7 +130,7 @@
   dmp.Diff_Timeout = 0;
   XCTAssertNil([dmp diff_halfMatchOfFirstString:@"qHilloHelloHew" andSecondString:@"xHelloHeHulloy"], @"Optimal no halfmatch.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_linesToCharsTest {
@@ -148,7 +146,7 @@
   XCTAssertEqualObjects(@"\001\002\001", [result objectAtIndex:0], @"Shared lines #1.");
   XCTAssertEqualObjects(@"\002\001\002", [result objectAtIndex:1], @"Shared lines #2.");
   XCTAssertEqualObjects(tmpVector, (NSArray *)[result objectAtIndex:2], @"Shared lines #3.");
-  
+
   [tmpVector removeAllObjects];
   [tmpVector addObject:@""];
   [tmpVector addObject:@"alpha\r\n"];
@@ -158,7 +156,7 @@
   XCTAssertEqualObjects(@"", [result objectAtIndex:0], @"Empty string and blank lines #1.");
   XCTAssertEqualObjects(@"\001\002\003\003", [result objectAtIndex:1], @"Empty string and blank lines #2.");
   XCTAssertEqualObjects(tmpVector, (NSArray *)[result objectAtIndex:2], @"Empty string and blank lines #3.");
-  
+
   [tmpVector removeAllObjects];
   [tmpVector addObject:@""];
   [tmpVector addObject:@"a"];
@@ -167,18 +165,18 @@
   XCTAssertEqualObjects(@"\001", [result objectAtIndex:0], @"No linebreaks #1.");
   XCTAssertEqualObjects(@"\002", [result objectAtIndex:1], @"No linebreaks #2.");
   XCTAssertEqualObjects(tmpVector, (NSArray *)[result objectAtIndex:2], @"No linebreaks #3.");
-  
+
   // More than 256 to reveal any 8-bit limitations.
   unichar n = 300;
   [tmpVector removeAllObjects];
   NSMutableString *lines = [NSMutableString string];
   NSMutableString *chars = [NSMutableString string];
   NSString *currentLine;
-  for (unichar x = 1; x < n + 1; x++) {
-    currentLine = [NSString stringWithFormat:@"%d\n", (int)x];
+  for (unichar i = 1; i < n + 1; i++) {
+    currentLine = [NSString stringWithFormat:@"%d\n", (int)i];
     [tmpVector addObject:currentLine];
     [lines appendString:currentLine];
-    [chars appendString:[NSString stringWithFormat:@"%C", x]];
+    [chars appendString:[NSString stringWithFormat:@"%C", i]];
   }
   XCTAssertEqual((NSUInteger)n, tmpVector.count, @"More than 256 #1.");
   XCTAssertEqual((NSUInteger)n, chars.length, @"More than 256 #2.");
@@ -187,76 +185,8 @@
   XCTAssertEqualObjects(chars, [result objectAtIndex:0], @"More than 256 #3.");
   XCTAssertEqualObjects(@"", [result objectAtIndex:1], @"More than 256 #4.");
   XCTAssertEqualObjects(tmpVector, (NSArray *)[result objectAtIndex:2], @"More than 256 #5.");
-  
-  JX_RELEASE(dmp);
-}
 
-- (void)test_diff_wordsToCharsTest {
-  DiffMatchPatch *dmp = [DiffMatchPatch new];
-  NSArray *result;
-  
-  // Convert words down to characters.
-  NSMutableArray *tmpVector = [NSMutableArray array];  // Array of NSString objects.
-  [tmpVector addObject:@""];
-  [tmpVector addObject:@"alpha"];
-  [tmpVector addObject:@" "];
-  [tmpVector addObject:@"beta"];
-  [tmpVector addObject:@"\n"];
-  result = [dmp diff_wordsToCharsForFirstString:@"alpha beta alpha\n" andSecondString:@"beta alpha beta\n"];
-  XCTAssertEqualObjects(@"\001\002\003\002\001\004", [result objectAtIndex:0], @"Convert words down to characters #1");
-  XCTAssertEqualObjects(@"\003\002\001\002\003\004", [result objectAtIndex:1], @"Convert words down to characters #2");
-  XCTAssertEqualObjects(tmpVector, (NSArray *)[result objectAtIndex:2], @"Convert words down to characters #3");
-  
-  [tmpVector removeAllObjects];
-  [tmpVector addObject:@""];
-  [tmpVector addObject:@"alpha"];
-  [tmpVector addObject:@"\r"];
-  [tmpVector addObject:@" "];
-  [tmpVector addObject:@"beta"];
-  [tmpVector addObject:@"\r\n"];
-  result = [dmp diff_wordsToCharsForFirstString:@"" andSecondString:@"alpha\r beta\r \r \r\n"];
-  XCTAssertEqualObjects(@"", [result objectAtIndex:0], @"Convert words down to characters #4");
-  XCTAssertEqualObjects(@"\001\002\003\004\002\003\002\003\005", [result objectAtIndex:1], @"Convert words down to characters #5");
-  XCTAssertEqualObjects(tmpVector, (NSArray *)[result objectAtIndex:2], @"Convert words down to characters #6");
-  
-  [tmpVector removeAllObjects];
-  [tmpVector addObject:@""];
-  [tmpVector addObject:@"a"];
-  [tmpVector addObject:@"b"];
-  result = [dmp diff_wordsToCharsForFirstString:@"a" andSecondString:@"b"];
-  XCTAssertEqualObjects(@"\001", [result objectAtIndex:0], @"Convert words down to characters #7");
-  XCTAssertEqualObjects(@"\002", [result objectAtIndex:1], @"Convert words down to characters #8");
-  XCTAssertEqualObjects(tmpVector, (NSArray *)[result objectAtIndex:2], @"Convert words down to characters #9");
-  
-  // More than 256 to reveal any 8-bit limitations.
-  unichar n = 300;
-  [tmpVector removeAllObjects];
-  NSMutableString *words = [NSMutableString string];
-  NSMutableString *chars = [NSMutableString string];
-
-  [words appendString:@" "];
-  
-  NSString *currentWord;
-  unichar i;
-  for (unichar x = 1; x < n + 1; x++) {
-    i = x + 1;
-    currentWord = [NSString stringWithFormat:@"%d ", (int)x];
-    [tmpVector addObject:[NSString stringWithFormat:@"%d", (int)x]];
-    [words appendString:currentWord];
-    [chars appendString:[NSString stringWithFormat:@"%C\001", i]];
-  }
-  XCTAssertEqual((NSUInteger)n, tmpVector.count, @"Convert words down to characters #10");
-  XCTAssertEqual((NSUInteger)n, chars.length/2, @"Convert words down to characters #11");
-  [tmpVector insertObject:@"" atIndex:0];
-  [tmpVector insertObject:@" " atIndex:1];
-  [chars insertString:@"\001" atIndex:0];
-  result = [dmp diff_wordsToCharsForFirstString:words andSecondString:@""];
-  NSMutableString *charsCmp = [result objectAtIndex:0];
-  XCTAssertEqualObjects(chars, charsCmp, @"Convert words down to characters #12");
-  XCTAssertEqualObjects(@"", [result objectAtIndex:1], @"Convert words down to characters #13");
-  XCTAssertEqualObjects(tmpVector, (NSArray *)[result objectAtIndex:2], @"Convert words down to characters #14");
-  
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_charsToLinesTest {
@@ -282,11 +212,11 @@
   NSMutableString *lines = [NSMutableString string];
   NSMutableString *chars = [NSMutableString string];
   NSString *currentLine;
-  for (unichar x = 1; x < n + 1; x++) {
-    currentLine = [NSString stringWithFormat:@"%d\n", (int)x];
+  for (unichar i = 1; i < n + 1; i++) {
+    currentLine = [NSString stringWithFormat:@"%d\n", (int)i];
     [tmpVector addObject:currentLine];
     [lines appendString:currentLine];
-    [chars appendString:[NSString stringWithFormat:@"%C", x]];
+    [chars appendString:[NSString stringWithFormat:@"%C", i]];
   }
   XCTAssertEqual((NSUInteger)n, tmpVector.count, @"More than 256 #1.");
   XCTAssertEqual((NSUInteger)n, chars.length, @"More than 256 #2.");
@@ -295,7 +225,20 @@
   [dmp diff_chars:diffs toLines:tmpVector];
   XCTAssertEqualObjects([NSArray arrayWithObject:[Diff diffWithOperation:DIFF_DELETE andText:lines]], diffs, @"More than 256 #3.");
 
-  JX_RELEASE(dmp);
+  // More than 65536 to verify any 16-bit limitation.
+  lines = [NSMutableString string];
+  for (int i = 1; i < 66000; i++) {
+    currentLine = [NSString stringWithFormat:@"%d\n", i];
+    [lines appendString:currentLine];
+  }
+  NSArray *result;
+  result = [dmp diff_linesToCharsForFirstString:lines andSecondString:@""];
+  diffs = [NSArray arrayWithObject:[Diff diffWithOperation:DIFF_INSERT andText:result[0]]];
+  [dmp diff_chars:diffs toLines:result[2]];
+  Diff *myDiff = diffs.firstObject;
+  XCTAssertEqualObjects(lines, myDiff.text, @"More than 65536.");
+
+  [dmp release];
 }
 
 - (void)test_diff_cleanupMergeTest {
@@ -374,7 +317,19 @@
   expectedResult = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_EQUAL andText:@"xca"], [Diff diffWithOperation:DIFF_DELETE andText:@"cba"], nil];
   XCTAssertEqualObjects(expectedResult, diffs, @"Slide edit right recursive.");
 
-  JX_RELEASE(dmp);
+  // Empty merge.
+  diffs = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_DELETE andText:@"b"], [Diff diffWithOperation:DIFF_INSERT andText:@"ab"], [Diff diffWithOperation:DIFF_EQUAL andText:@"c"], nil];
+  [dmp diff_cleanupMerge:diffs];
+  expectedResult = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_INSERT andText:@"a"], [Diff diffWithOperation:DIFF_EQUAL andText:@"bc"], nil];
+  XCTAssertEqualObjects(expectedResult, diffs, @"Empty merge.");
+
+  // Empty equality.
+  diffs = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_EQUAL andText:@""], [Diff diffWithOperation:DIFF_INSERT andText:@"a"], [Diff diffWithOperation:DIFF_EQUAL andText:@"b"], nil];
+  [dmp diff_cleanupMerge:diffs];
+  expectedResult = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_INSERT andText:@"a"], [Diff diffWithOperation:DIFF_EQUAL andText:@"b"], nil];
+  XCTAssertEqualObjects(expectedResult, diffs, @"Empty equality.");
+
+  [dmp release];
 }
 
 - (void)test_diff_cleanupSemanticLosslessTest {
@@ -459,17 +414,17 @@
 
   // Alphanumeric boundaries.
   diffs = [NSMutableArray arrayWithObjects:
-           [Diff diffWithOperation:DIFF_EQUAL andText:@"The xxx. The "],
-           [Diff diffWithOperation:DIFF_INSERT andText:@"zzz. The "],
-           [Diff diffWithOperation:DIFF_EQUAL andText:@"yyy."], nil];
+      [Diff diffWithOperation:DIFF_EQUAL andText:@"The xxx. The "],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"zzz. The "],
+      [Diff diffWithOperation:DIFF_EQUAL andText:@"yyy."], nil];
   [dmp diff_cleanupSemanticLossless:diffs];
   expectedResult = [NSMutableArray arrayWithObjects:
-                    [Diff diffWithOperation:DIFF_EQUAL andText:@"The xxx."],
-                    [Diff diffWithOperation:DIFF_INSERT andText:@" The zzz."],
-                    [Diff diffWithOperation:DIFF_EQUAL andText:@" The yyy."], nil];
+      [Diff diffWithOperation:DIFF_EQUAL andText:@"The xxx."],
+      [Diff diffWithOperation:DIFF_INSERT andText:@" The zzz."],
+      [Diff diffWithOperation:DIFF_EQUAL andText:@" The yyy."], nil];
   XCTAssertEqualObjects(expectedResult, diffs, @"Sentence boundaries.");
-  
-  JX_RELEASE(dmp);
+
+  [dmp release];
 }
 
 - (void)test_diff_cleanupSemanticTest {
@@ -565,55 +520,55 @@
 
   // No overlap elimination.
   diffs = [NSMutableArray arrayWithObjects:
-           [Diff diffWithOperation:DIFF_DELETE andText:@"abcxx"],
-           [Diff diffWithOperation:DIFF_INSERT andText:@"xxdef"], nil];
+      [Diff diffWithOperation:DIFF_DELETE andText:@"abcxx"],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"xxdef"], nil];
   [dmp diff_cleanupSemantic:diffs];
   expectedResult = [NSMutableArray arrayWithObjects:
-                    [Diff diffWithOperation:DIFF_DELETE andText:@"abcxx"],
-                    [Diff diffWithOperation:DIFF_INSERT andText:@"xxdef"], nil];
+      [Diff diffWithOperation:DIFF_DELETE andText:@"abcxx"],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"xxdef"], nil];
   XCTAssertEqualObjects(expectedResult, diffs, @"No overlap elimination.");
-  
+
   // Overlap elimination.
   diffs = [NSMutableArray arrayWithObjects:
-           [Diff diffWithOperation:DIFF_DELETE andText:@"abcxxx"],
-           [Diff diffWithOperation:DIFF_INSERT andText:@"xxxdef"], nil];
+      [Diff diffWithOperation:DIFF_DELETE andText:@"abcxxx"],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"xxxdef"], nil];
   [dmp diff_cleanupSemantic:diffs];
   expectedResult = [NSMutableArray arrayWithObjects:
-                    [Diff diffWithOperation:DIFF_DELETE andText:@"abc"],
-                    [Diff diffWithOperation:DIFF_EQUAL andText:@"xxx"],
-                    [Diff diffWithOperation:DIFF_INSERT andText:@"def"], nil];
+      [Diff diffWithOperation:DIFF_DELETE andText:@"abc"],
+      [Diff diffWithOperation:DIFF_EQUAL andText:@"xxx"],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"def"], nil];
   XCTAssertEqualObjects(expectedResult, diffs, @"Overlap elimination.");
-  
+
   // Reverse overlap elimination.
   diffs = [NSMutableArray arrayWithObjects:
-           [Diff diffWithOperation:DIFF_DELETE andText:@"xxxabc"],
-           [Diff diffWithOperation:DIFF_INSERT andText:@"defxxx"], nil];
+      [Diff diffWithOperation:DIFF_DELETE andText:@"xxxabc"],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"defxxx"], nil];
   [dmp diff_cleanupSemantic:diffs];
   expectedResult = [NSMutableArray arrayWithObjects:
-                    [Diff diffWithOperation:DIFF_INSERT andText:@"def"],
-                    [Diff diffWithOperation:DIFF_EQUAL andText:@"xxx"],
-                    [Diff diffWithOperation:DIFF_DELETE andText:@"abc"], nil];
+      [Diff diffWithOperation:DIFF_INSERT andText:@"def"],
+      [Diff diffWithOperation:DIFF_EQUAL andText:@"xxx"],
+      [Diff diffWithOperation:DIFF_DELETE andText:@"abc"], nil];
   XCTAssertEqualObjects(expectedResult, diffs, @"Reverse overlap elimination.");
-  
+
   // Two overlap eliminations.
   diffs = [NSMutableArray arrayWithObjects:
-           [Diff diffWithOperation:DIFF_DELETE andText:@"abcd1212"],
-           [Diff diffWithOperation:DIFF_INSERT andText:@"1212efghi"],
-           [Diff diffWithOperation:DIFF_EQUAL andText:@"----"],
-           [Diff diffWithOperation:DIFF_DELETE andText:@"A3"],
-           [Diff diffWithOperation:DIFF_INSERT andText:@"3BC"], nil];
+      [Diff diffWithOperation:DIFF_DELETE andText:@"abcd1212"],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"1212efghi"],
+      [Diff diffWithOperation:DIFF_EQUAL andText:@"----"],
+      [Diff diffWithOperation:DIFF_DELETE andText:@"A3"],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"3BC"], nil];
   [dmp diff_cleanupSemantic:diffs];
   expectedResult = [NSMutableArray arrayWithObjects:
-                    [Diff diffWithOperation:DIFF_DELETE andText:@"abcd"],
-                    [Diff diffWithOperation:DIFF_EQUAL andText:@"1212"],
-                    [Diff diffWithOperation:DIFF_INSERT andText:@"efghi"],
-                    [Diff diffWithOperation:DIFF_EQUAL andText:@"----"],
-                    [Diff diffWithOperation:DIFF_DELETE andText:@"A"],
-                    [Diff diffWithOperation:DIFF_EQUAL andText:@"3"],
-                    [Diff diffWithOperation:DIFF_INSERT andText:@"BC"], nil];
+      [Diff diffWithOperation:DIFF_DELETE andText:@"abcd"],
+      [Diff diffWithOperation:DIFF_EQUAL andText:@"1212"],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"efghi"],
+      [Diff diffWithOperation:DIFF_EQUAL andText:@"----"],
+      [Diff diffWithOperation:DIFF_DELETE andText:@"A"],
+      [Diff diffWithOperation:DIFF_EQUAL andText:@"3"],
+      [Diff diffWithOperation:DIFF_INSERT andText:@"BC"], nil];
   XCTAssertEqualObjects(expectedResult, diffs, @"Two overlap eliminations.");
-  
-  JX_RELEASE(dmp);
+
+  [dmp release];
 }
 
 - (void)test_diff_cleanupEfficiencyTest {
@@ -698,7 +653,7 @@
   XCTAssertEqualObjects(expectedResult, diffs, @"High cost elimination.");
   dmp.Diff_EditCost = 4;
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_prettyHtmlTest {
@@ -712,7 +667,7 @@
   NSString *expectedResult = @"<span>a&para;<br></span><del style=\"background:#ffe6e6;\">&lt;B&gt;b&lt;/B&gt;</del><ins style=\"background:#e6ffe6;\">c&amp;d</ins>";
   XCTAssertEqualObjects(expectedResult, [dmp diff_prettyHtml:diffs], @"Pretty print.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_textTest {
@@ -731,7 +686,7 @@
 
   XCTAssertEqualObjects(@"jumped over a lazy", [dmp diff_text2:diffs], @"Compute the source and destination texts #2");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_deltaTest {
@@ -810,7 +765,23 @@
   expectedResult = [dmp diff_fromDeltaWithText:@"" andDelta:delta error:NULL];
   XCTAssertEqualObjects(diffs, expectedResult, @"diff_fromDelta: Unchanged characters. Convert delta string into a diff.");
 
-  JX_RELEASE(dmp);
+  // 160 kb string.
+  NSString *a = @"abcdefghij";
+  NSMutableString *aMutable = [NSMutableString stringWithString:a];
+  for (int i = 0; i < 14; i++) {
+    [aMutable appendString:aMutable];
+  }
+  a = aMutable;
+  diffs = [NSMutableArray arrayWithObject:
+           [Diff diffWithOperation:DIFF_INSERT andText:a]];
+  delta = [dmp diff_toDelta:diffs];
+  XCTAssertEqualObjects([@"+" stringByAppendingString:a], delta, @"diff_toDelta: 160kb string.");
+  
+  // Convert delta string into a diff.
+  expectedResult = [dmp diff_fromDeltaWithText:@"" andDelta:delta error:NULL];
+  XCTAssertEqualObjects(diffs, expectedResult, @"diff_fromDelta: 160kb string. Convert delta string into a diff.");
+
+  [dmp release];
 }
 
 - (void)test_diff_xIndexTest {
@@ -829,7 +800,7 @@
       [Diff diffWithOperation:DIFF_EQUAL andText:@"xyz"], nil] /* Diff */;
   XCTAssertEqual((NSUInteger)1, [dmp diff_xIndexIn:diffs location:3], @"diff_xIndex: Translation on deletion.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_levenshteinTest {
@@ -853,7 +824,7 @@
       [Diff diffWithOperation:DIFF_INSERT andText:@"1234"], nil] /* Diff */;
   XCTAssertEqual((NSUInteger)7, [dmp diff_levenshtein:diffs], @"diff_levenshtein: Levenshtein with middle equality.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)diff_bisectTest;
@@ -873,7 +844,7 @@
   diffs = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_DELETE andText:@"cat"], [Diff diffWithOperation:DIFF_INSERT andText:@"map"], nil];
   XCTAssertEqualObjects(diffs, [dmp diff_bisectOfOldString:a andNewString:b deadline:[[NSDate distantPast] timeIntervalSinceReferenceDate]], @"Bisect timeout.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_diff_mainTest {
@@ -907,8 +878,8 @@
   diffs = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_DELETE andText:@"Apple"], [Diff diffWithOperation:DIFF_INSERT andText:@"Banana"], [Diff diffWithOperation:DIFF_EQUAL andText:@"s are a"], [Diff diffWithOperation:DIFF_INSERT andText:@"lso"], [Diff diffWithOperation:DIFF_EQUAL andText:@" fruit."], nil];
   XCTAssertEqualObjects(diffs, [dmp diff_mainOfOldString:@"Apples are a fruit." andNewString:@"Bananas are also fruit." checkLines:NO], @"diff_main: Simple case #2.");
 
-  diffs = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_DELETE andText:@"a"], [Diff diffWithOperation:DIFF_INSERT andText:@"\U00000680"], [Diff diffWithOperation:DIFF_EQUAL andText:@"x"], [Diff diffWithOperation:DIFF_DELETE andText:@"\t"], [Diff diffWithOperation:DIFF_INSERT andText:[NSString stringWithFormat:@"%C", (unichar)0]], nil];
-  NSString *aString = [NSString stringWithFormat:@"\U00000680x%C", (unichar)0];
+  diffs = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_DELETE andText:@"a"], [Diff diffWithOperation:DIFF_INSERT andText:@"\U00000680"], [Diff diffWithOperation:DIFF_EQUAL andText:@"x"], [Diff diffWithOperation:DIFF_DELETE andText:@"\t"], [Diff diffWithOperation:DIFF_INSERT andText:[NSString stringWithFormat:@"%C", 0]], nil];
+  NSString *aString = [NSString stringWithFormat:@"\U00000680x%C", 0];
   XCTAssertEqualObjects(diffs, [dmp diff_mainOfOldString:@"ax\t" andNewString:aString checkLines:NO], @"diff_main: Simple case #3.");
 
   diffs = [NSMutableArray arrayWithObjects:[Diff diffWithOperation:DIFF_DELETE andText:@"1"], [Diff diffWithOperation:DIFF_EQUAL andText:@"a"], [Diff diffWithOperation:DIFF_DELETE andText:@"y"], [Diff diffWithOperation:DIFF_EQUAL andText:@"b"], [Diff diffWithOperation:DIFF_DELETE andText:@"2"], [Diff diffWithOperation:DIFF_INSERT andText:@"xab"], nil];
@@ -929,7 +900,7 @@
   NSMutableString *aMutable = [NSMutableString stringWithString:a];
   NSMutableString *bMutable = [NSMutableString stringWithString:b];
   // Increase the text lengths by 1024 times to ensure a timeout.
-  for (int x = 0; x < 10; x++) {
+  for (int i = 0; i < 10; i++) {
     [aMutable appendString:aMutable];
     [bMutable appendString:bMutable];
   }
@@ -965,7 +936,7 @@
 
   // CHANGEME: Test null inputs
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 
@@ -990,7 +961,7 @@
   [bitmask diff_setUnsignedIntegerValue:8 forUnicharKey:'c'];
   XCTAssertEqualObjects(bitmask, [dmp match_alphabet:@"abcaba"], @"match_alphabet: Duplicates.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_match_bitapTest {
@@ -1039,7 +1010,7 @@
   dmp.Match_Distance = 1000;  // Loose location.
   XCTAssertEqual((NSUInteger)0, [dmp match_bitapOfText:@"abcdefghijklmnopqrstuvwxyz" andPattern:@"abcdefg" near:24], @"match_bitap: Distance test #3.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_match_mainTest {
@@ -1064,7 +1035,7 @@
 
   // CHANGEME: Test null inputs
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 
@@ -1074,7 +1045,7 @@
 
 - (void)test_patch_patchObjTest {
   // Patch Object.
-  Patch *p = JX_AUTORELEASE([Patch new]);
+  Patch *p = [[Patch new] autorelease];
   p.start1 = 20;
   p.start2 = 21;
   p.length1 = 18;
@@ -1114,7 +1085,7 @@
   }
   error = nil;
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_patch_toTextTest {
@@ -1129,7 +1100,7 @@
   patches = [dmp patch_fromText:strp error:NULL];
   XCTAssertEqualObjects(strp, [dmp patch_toText:patches], @"toText Test #2");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_patch_addContextTest {
@@ -1153,7 +1124,7 @@
   [dmp patch_addContextToPatch:p sourceText:@"The quick brown fox jumps.  The quick brown fox crashes."];
   XCTAssertEqualObjects(@"@@ -1,27 +1,28 @@\n Th\n-e\n+at\n  quick brown fox jumps. \n", [p description], @"patch_addContext: Ambiguity.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_patch_makeTest {
@@ -1210,7 +1181,7 @@
 
   // CHANGEME: Test null inputs
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 
@@ -1236,7 +1207,7 @@
   [dmp patch_splitMax:patches];
   XCTAssertEqualObjects(@"@@ -2,32 +2,32 @@\n bcdefghij , h : \n-0\n+1\n  , t : 1 abcdef\n@@ -29,32 +29,32 @@\n bcdefghij , h : \n-0\n+1\n  , t : 1 abcdef\n", [dmp patch_toText:patches], @"Assumes that Match_MaxBits is 32 #4");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_patch_addPaddingTest {
@@ -1270,7 +1241,7 @@
       [dmp patch_toText:patches],
       @"patch_addPadding: Both edges none.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 - (void)test_patch_applyTest {
@@ -1360,7 +1331,7 @@
   resultStr = [NSString stringWithFormat:@"%@\t%@", [results objectAtIndex:0], stringForBOOL([boolArray objectAtIndex:0])];
   XCTAssertEqualObjects(@"x123\ttrue", resultStr, @"patch_apply: Edge partial match.");
 
-  JX_RELEASE(dmp);
+  [dmp release];
 }
 
 
