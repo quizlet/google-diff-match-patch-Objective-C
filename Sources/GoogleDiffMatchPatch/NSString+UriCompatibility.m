@@ -47,6 +47,7 @@
  *
  * @return The unescaped NSString.
  */
+
 - (NSString *)diff_stringByReplacingPercentEscapesForEncodeUriCompatibility {
   NSString *decodedString = [self stringByRemovingPercentEncoding];
   return decodedString;
