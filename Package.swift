@@ -20,7 +20,7 @@ let package = Package(
                 .unsafeFlags(["-fno-objc-arc"])
             ],
             linkerSettings: [
-                .unsafeFlags(["-ObjC"])
+                .unsafeFlags(["-Xlinker", "-ObjC"])
             ]
         ),
     ]
