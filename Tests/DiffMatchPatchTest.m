@@ -1363,6 +1363,150 @@
   JX_RELEASE(dmp);
 }
 
+/*
+ * Invalid percent escapes must be a hard parse error, matching diff_fromDelta.
+ * A nil decode must not be stored in a Diff: patch_apply, patch_toText, and
+ * Patch's description pass that text to Foundation APIs that raise
+ * NSInvalidArgumentException.
+ */
+- (void)assertPatchOperationRaisesInvalidArgument:(void (^)(void))operation
+                                             name:(NSString *)name;
+{
+  @try {
+    operation();
+    XCTFail(@"%@ completed with a diff whose text failed percent-decoding", name);
+  }
+  @catch (NSException *exception) {
+    XCTAssertEqualObjects(exception.name, NSInvalidArgumentException,
+                          @"%@ raised %@ instead of NSInvalidArgumentException",
+                          name, exception.name);
+  }
+}
+
+- (void)assertInvalidPercentEncodedPatch:(NSString *)patchText
+                                   label:(NSString *)label;
+{
+  DiffMatchPatch *dmp = [DiffMatchPatch new];
+  NSError *error = nil;
+  NSMutableArray *patches = [dmp patch_fromText:patchText error:&error];
+
+  XCTAssertNil(patches, @"%@: patch_fromText must return nil", label);
+  XCTAssertNotNil(error, @"%@: patch_fromText must set an error", label);
+  if (error != nil) {
+    XCTAssertEqualObjects(error.domain, @"DiffMatchPatchErrorDomain", @"%@: error domain", label);
+    XCTAssertEqual(error.code, (NSInteger)104, @"%@: error code", label);
+  }
+
+  NSMutableArray *ignoredError = [dmp patch_fromText:patchText error:NULL];
+  XCTAssertNil(ignoredError, @"%@: a NULL error pointer must still reject the patch", label);
+
+  NSMutableArray *badPatches = (patches != nil) ? patches : ignoredError;
+  if (badPatches != nil) {
+    BOOL hasNilNonInsert = NO;
+    for (Patch *patch in badPatches) {
+      BOOL patchHasNil = NO;
+      BOOL patchHasNilNonInsert = NO;
+      BOOL patchHasNilNonDelete = NO;
+      for (Diff *diff in patch.diffs) {
+        if (diff.text == nil) {
+          patchHasNil = YES;
+          if (diff.operation != DIFF_INSERT) {
+            hasNilNonInsert = YES;
+            patchHasNilNonInsert = YES;
+          }
+          if (diff.operation != DIFF_DELETE) {
+            patchHasNilNonDelete = YES;
+          }
+        }
+        XCTAssertNotNil(diff.text, @"%@: Diff text must not be nil", label);
+      }
+      // Serialization appends every decoded line, including a nil one.
+      if (patchHasNil) {
+        [self assertPatchOperationRaisesInvalidArgument:^{
+          (void)[patch description];
+        } name:[NSString stringWithFormat:@"%@: -[Patch description]", label]];
+      }
+      if (patchHasNilNonInsert) {
+        [self assertPatchOperationRaisesInvalidArgument:^{
+          (void)[dmp diff_text1:patch.diffs];
+        } name:[NSString stringWithFormat:@"%@: diff_text1", label]];
+      }
+      if (patchHasNilNonDelete) {
+        [self assertPatchOperationRaisesInvalidArgument:^{
+          (void)[dmp diff_text2:patch.diffs];
+        } name:[NSString stringWithFormat:@"%@: diff_text2", label]];
+      }
+    }
+    if (badPatches.count > 0) {
+      [self assertPatchOperationRaisesInvalidArgument:^{
+        (void)[dmp patch_toText:badPatches];
+      } name:[NSString stringWithFormat:@"%@: patch_toText", label]];
+    }
+    // patch_apply appends every non-insert line while building the text to
+    // match. A leading equality is passed to stringByAppendingString: first.
+    if (hasNilNonInsert) {
+      [self assertPatchOperationRaisesInvalidArgument:^{
+        (void)[dmp patch_apply:badPatches toString:@"hello"];
+      } name:[NSString stringWithFormat:@"%@: patch_apply", label]];
+    }
+  }
+
+  JX_RELEASE(dmp);
+}
+
+- (void)test_patch_fromText_invalidPercentEncodingIsHardError {
+  // Lone percent sign, a non-hex escape, a truncated escape, and a
+  // percent-encoded byte that is not valid UTF-8. Each sign that
+  // patch_fromText decodes must be rejected.
+  NSArray *bodies = [NSArray arrayWithObjects:@"%", @"%ZZ", @"%A", @"%80", @"%C0%80", @"a%", nil];
+  NSArray *signs = [NSArray arrayWithObjects:@"-", @"+", @" ", nil];
+  for (NSString *body in bodies) {
+    for (NSString *sign in signs) {
+      NSString *patchText = [NSString stringWithFormat:@"@@ -1,1 +1,1 @@\n%@%@\n", sign, body];
+      NSString *label = [NSString stringWithFormat:@"sign '%@' body '%@'", sign, body];
+      [self assertInvalidPercentEncodedPatch:patchText label:label];
+    }
+  }
+
+  // A valid line before the bad one must not commit a partial patch.
+  [self assertInvalidPercentEncodedPatch:@"@@ -1,2 +1,2 @@\n-ab\n+%80\n"
+                                    label:@"valid line then invalid insert"];
+  [self assertInvalidPercentEncodedPatch:@"@@ -1 +1 @@\n-a\n+b\n@@ -2 +2 @@\n-%\n"
+                                    label:@"valid hunk then invalid hunk"];
+
+  // diff_fromDelta already rejects the same class of escape. Keep that.
+  DiffMatchPatch *dmp = [DiffMatchPatch new];
+  NSError *error = nil;
+  NSMutableArray *diffs = [dmp diff_fromDeltaWithText:@"" andDelta:@"+%80" error:&error];
+  XCTAssertNil(diffs, @"diff_fromDelta must keep rejecting invalid percent escapes");
+  XCTAssertNotNil(error, @"diff_fromDelta must set an error for an invalid percent escape");
+  JX_RELEASE(dmp);
+}
+
+- (void)test_patch_fromText_validPercentEncodingStillApplies {
+  DiffMatchPatch *dmp = [DiffMatchPatch new];
+  NSError *error = nil;
+  NSString *patchText = @"@@ -1 +1 @@\n-%61\n+b\n";
+  NSMutableArray *patches = [dmp patch_fromText:patchText error:&error];
+  XCTAssertNotNil(patches, @"a valid percent escape must parse");
+  XCTAssertNil(error, @"a valid percent escape must not set an error");
+  XCTAssertTrue(patches.count == 1, @"one hunk");
+  if (patches.count == 1) {
+    Patch *patch = [patches objectAtIndex:0];
+    XCTAssertTrue(patch.diffs.count == 2, @"delete and insert");
+    if (patch.diffs.count == 2) {
+      Diff *deleted = [patch.diffs objectAtIndex:0];
+      XCTAssertEqual(deleted.operation, DIFF_DELETE, @"first line is a deletion");
+      XCTAssertEqualObjects(deleted.text, @"a", @"%%61 decodes to a");
+    }
+    NSArray *applied = [dmp patch_apply:patches toString:@"a"];
+    XCTAssertEqualObjects([applied objectAtIndex:0], @"b", @"valid patch still applies");
+    XCTAssertNotNil([dmp patch_toText:patches], @"valid patch still serializes");
+    XCTAssertNotNil([patch description], @"valid patch description");
+  }
+  JX_RELEASE(dmp);
+}
+
 
 #pragma mark Test Utility Functions
 //  TEST UTILITY FUNCTIONS
